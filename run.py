@@ -8,13 +8,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver import ChromeOptions
+from selenium.webdriver.common.action_chains import ActionChains
 import csv
 import os
 import re
 import random
 
 def start():
-    url = 'https://www.linkedin.com/search/results/people/?keywords=Big%20Data'
+    
+    url = 'https://www.linkedin.com/search/results/people/?keywords=Data%20Science'
     system_name = os.getlogin()
     connected = open('Connects.csv','w',newline='')
     writer = csv.writer(connected)
@@ -30,7 +32,7 @@ def start():
     driver = uc.Chrome(options=opt,use_subprocess=True)
     driver.maximize_window()
     driver.get(url)
-    
+    action = ActionChains(driver)
     i = 1
     while True:
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -39,7 +41,7 @@ def start():
         for profile,name in zip(driver.find_elements(by=By.XPATH,value="//button[contains(@aria-label,'Invite')]"),sel.xpath("//button[contains(@aria-label,'Invite')]/@aria-label").getall()):
             try:
                 name = re.match(r"(?:Invite)(.*?)to",name).group(1)
-                profile.click()
+                action.move_to_element(profile).click().perform()
                 time.sleep(random.choice([j for j in range(3,10)]))
                 try:
                     driver.find_element(by=By.XPATH,value="//button[@aria-label='Add a note']").click()
@@ -61,6 +63,7 @@ def start():
                         time.sleep(random.choice([j for j in range(3,10)]))
             except Exception as e:
                 traceback.print_exc()
+                print("exception in main")
             else:
                 print(f"\r [+] Done {i}",end='')
                 if i == limit:
@@ -73,7 +76,9 @@ def start():
         else:
             try:
                 current = driver.current_url
-                driver.find_element(by=By.XPATH,value="//button[@aria-label='Next']").click()
+                next = driver.find_element(by=By.XPATH,value="//button[@aria-label='Next']")
+                action.move_to_element(next).click().perform()
+                # driver.find_element(by=By.XPATH,value="//button[@aria-label='Next']").click()
             except Exception as e:
                 # print(e)
                 pass
