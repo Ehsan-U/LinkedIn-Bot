@@ -46,7 +46,7 @@ def start():
                 try:
                     driver.find_element(by=By.XPATH,value="//button[@aria-label='Add a note']").click()
                 except:
-                    driver.find_element(by=By.XPATH,value="//button[@aria-label='Dismiss'][1]").click()
+                    driver.get(driver.current_url)
                     continue
                 else:
                     time.sleep(random.choice([j for j in range(3,10)]))
@@ -59,7 +59,7 @@ def start():
                         i += 1
                         writer.writerow([name])
                     else:
-                        driver.find_element(by=By.XPATH,value="//button[@aria-label='Dismiss'][1]").click()
+                        driver.get(driver.current_url)
                         time.sleep(random.choice([j for j in range(3,10)]))
             except Exception as e:
                 traceback.print_exc()
