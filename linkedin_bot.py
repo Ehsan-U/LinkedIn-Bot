@@ -76,7 +76,6 @@ class Linkedin_Bot():
             if self.wait_for_element("//div[contains(@class, 'feed-identity-module__actor')]", timeout=30000) == None:
                 raise Exception()
         except Exception as e:
-            print_exc()
             self.logger.info(" [+] Login Failed")
             return None
         else:
