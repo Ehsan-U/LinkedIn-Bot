@@ -13,10 +13,8 @@ class Linkedin_Bot():
     coloredlogs.install(level='DEBUG')
 
 
-
     def __init__(self):
         self.login_url = 'https://www.linkedin.com/login'
-
 
 
     def init_playwright(self):
@@ -25,12 +23,10 @@ class Linkedin_Bot():
         self.page.route("**media.licdn.com/*", lambda route: route.abort() if route.request.resource_type == "image"  else route.continue_())
 
 
-
     # behave like human
     def being_human(self):
         self.page.mouse.move(random.randint(-50, 50),random.randint(-50, 50)) 
         time.sleep(random.uniform(1.0, 3.0))
-
 
 
     def wait_for_element(self, path, timeout=10000, retry=False):
@@ -45,12 +41,10 @@ class Linkedin_Bot():
             return True
 
 
-
     def get_person_name(self):
         raw_name = self.page.locator("//div[@class='pvs-profile-actions ']/div/button[contains(@aria-label, 'connect')]").get_attribute('aria-label')
         if raw_name:
             return re.match(r"(?:Invite)(.*?)to",raw_name).group(1).strip()
-
 
 
     def connect(self, url, message=None):
@@ -69,7 +63,6 @@ class Linkedin_Bot():
                 self.logger.info(f" [+] Connected to {personName}!")
         else:
             self.logger.info(" [+] Connection already pending!")      
-
 
 
     def login(self, username, password):   
@@ -91,7 +84,6 @@ class Linkedin_Bot():
             return True
 
 
-
     def main(self):
         username = 'dorin79289@chotunai.com'
         password = 'l*kc841tIvd0C5LqG8^9qm'
@@ -100,7 +92,6 @@ class Linkedin_Bot():
             person = 'https://www.linkedin.com/in/abdullahskzai/'
             self.connect(person, message="Hello")
         self.play.stop()
-
 
 
 bot = Linkedin_Bot()
