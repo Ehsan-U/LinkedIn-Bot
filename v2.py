@@ -31,7 +31,7 @@ class Linkedin_Bot():
         self.login_url = 'https://www.linkedin.com/login'
         self.logged_In = False
         self.page_no = 1
-        self.count = 1
+        self.connect_count = 1
 
 
     def init_driver(self):
@@ -102,10 +102,10 @@ class Linkedin_Bot():
                 self.action.move_to_element(profile).click().perform()
                 self.connect(name)
                 self.im_not_robot(delay={"min":3, "max":5})
-                if self.count == self.connects_limit:
+                if self.connect_count == self.connects_limit:
                     return None
                 else:
-                    self.count +=1
+                    self.connect_count +=1
             if self.wait_for_element("//button[@aria-label='Next']"):
                 self.page_no +=1
                 self.search(url + f"&page={self.page_no}")
