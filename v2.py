@@ -18,18 +18,21 @@ from parsel import Selector
 import pickle
 from sqlalchemy import create_engine, Column, Integer, String, select, inspect, MetaData, Table
 from sqlalchemy.orm import sessionmaker,declarative_base
+from hashlib import sha256
 Base = declarative_base()
 
 
 ###### DB section ######
 class Person(Base):
     __tablename__ = 'connections'
-    url = Column(String, primary_key=True)
+    person_id = Column(String, primary_key=True)
+    url = Column(String)
     name = Column(String)
-    location = Column(Integer)
-    profile_headline = Column(Integer)
+    location = Column(String)
+    profile_headline = Column(String)
 
-    def __init__(self, url, name, location, profile_headline):
+    def __init__(self, person_id, url, name, location, profile_headline):
+        self.person_id = person_id
         self.url = url
         self.name = name
         self.location = location
@@ -68,6 +71,7 @@ class Linkedin_Bot():
             self.conn = engine.connect()
             self.metadata = MetaData()
             if not table_exist:
+                print('run it')
                 Base.metadata.create_all(engine)
             Session = sessionmaker(bind=engine)
             self.session = Session()
@@ -79,31 +83,32 @@ class Linkedin_Bot():
             return True
 
 
-    def already_exist(self, item):
-        table = Table(
-            'connections', 
-            self.metadata,
-            Column('url', String, primary_key=True, nullable=False),
-            Column('name', String),
-            Column('location', String),
-            Column('profile_headline', String),
-        )
-        statement = select(table).where(table.columns.url == item['url'])
-        result = self.conn.execute(statement)
-        record = result.fetchone()
-        return record
+    # def already_exist(self, item):
+    #     table = Table(
+    #         'connections', 
+    #         self.metadata,
+    #         Column('person_id', String, primary_key=True, nullable=False),
+    #         Column('url', String),
+    #         Column('name', String),
+    #         Column('location', String),
+    #         Column('profile_headline', String),
+    #     )
+    #     statement = select(table).where(table.columns.get('person_id') == item['person_id'])
+    #     result = self.conn.execute(statement)
+    #     record = result.fetchone()
+    #     return record
 
 
     def dump_person(self, item):
         person = Person(
+            person_id = item['person_id'],
             url= item['url'], 
             name= item['name'], 
             location= item['location'], 
             profile_headline= item['profile_headline']
         )
-        if not self.already_exist(item):
-            self.session.add(person)
-            self.session.commit()
+        self.session.add(person)
+        self.session.commit()
         # else:
             # self.logger.info(f" [+] {item['name']} already exist in the db!")
 
@@ -188,6 +193,7 @@ class Linkedin_Bot():
         profile_headline = response.xpath(".//div[contains(@class, 'entity-result__primary-subtitle')]/text()[2]").get()
         location = response.xpath(".//div[contains(@class, 'entity-result__secondary-subtitle')]/text()[2]").get()
         item = {
+            'person_id': sha256(source_url.encode()).hexdigest()[:16],
             'url':source_url,
             'name':name,
             'profile_headline':profile_headline,
