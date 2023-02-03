@@ -14,12 +14,32 @@ import re
 import json
 import random
 import pyautogui
+from parsel import Selector
 import pickle
+from sqlalchemy import create_engine, Column, Integer, String, select, inspect, MetaData, Table
+from sqlalchemy.orm import sessionmaker,declarative_base
+Base = declarative_base()
+
+
+###### DB section ######
+class Person(Base):
+    __tablename__ = 'connections'
+    url = Column(String, primary_key=True)
+    name = Column(String)
+    location = Column(Integer)
+    profile_headline = Column(Integer)
+
+    def __init__(self, url, name, location, profile_headline):
+        self.url = url
+        self.name = name
+        self.location = location
+        self.profile_headline = profile_headline
 
 
 
 class LoginRequired(Exception):
     pass
+
 
 
 class Linkedin_Bot():
@@ -41,11 +61,59 @@ class Linkedin_Bot():
         self.action = ActionChains(self.driver)
 
 
-    def load_creds(self):
-        if os.path.exists('./creds.json'):
-            with open('creds.json', 'r') as f:
-                self.creds  = json.load(f)
-                return self.creds.values()
+    def init_db(self):
+        try:
+            engine = create_engine(self.server_uri)
+            table_exist = True if 'connections' in inspect(engine).get_table_names() else False
+            self.conn = engine.connect()
+            self.metadata = MetaData()
+            if not table_exist:
+                Base.metadata.create_all(engine)
+            Session = sessionmaker(bind=engine)
+            self.session = Session()
+        except Exception:
+            # traceback.print_exc()
+            self.logger.warning(" [+] DB connection failed")
+            return False
+        else:
+            return True
+
+
+    def already_exist(self, item):
+        table = Table(
+            'connections', 
+            self.metadata,
+            Column('url', String, primary_key=True, nullable=False),
+            Column('name', String),
+            Column('location', String),
+            Column('profile_headline', String),
+        )
+        statement = select(table).where(table.columns.url == item['url'])
+        result = self.conn.execute(statement)
+        record = result.fetchone()
+        return record
+
+
+    def dump_person(self, item):
+        person = Person(
+            url= item['url'], 
+            name= item['name'], 
+            location= item['location'], 
+            profile_headline= item['profile_headline']
+        )
+        if not self.already_exist(item):
+            self.session.add(person)
+            self.session.commit()
+        # else:
+            # self.logger.info(f" [+] {item['name']} already exist in the db!")
+
+
+    def load_config(self):
+        if os.path.exists('./config.json'):
+            with open('config.json', 'r') as f:
+                config  = json.load(f)
+                self.username, self.password = config['credentials'].values()
+                self.server_uri = config['db_config']['uri']
         else:
             self.logger.info(f" [+] Credentials missing!")
             sys.exit()
@@ -71,7 +139,7 @@ class Linkedin_Bot():
             return True
 
 
-    def connect(self, name):
+    def connect(self, person):
         """ connect to a person """
         try:
             if self.message:
@@ -79,17 +147,17 @@ class Linkedin_Bot():
                 self.im_not_robot()
                 self.driver.find_element(By.XPATH,"//textarea[@id='custom-message']").send_keys(self.message)
                 self.im_not_robot()
-            self.driver.find_element(By.XPATH,"//button[@aria-label='Send now']").click()
-            self.logger.info(f" [+] Request sent to {name}!")
+            # self.driver.find_element(By.XPATH,"//button[@aria-label='Send now']").click()
+            self.logger.info(f" [+] Request sent to {person['name']}!")
+            self.dump_person(person)
         except TimeoutError:
             traceback.print_exc()
-            self.logger.info(f" [+] Skipping {name}!")
+            self.logger.info(f" [+] Skipping {person['name']}!")
 
 
-    def search(self, query):
+    def search(self, url):
         """ perform search and connect() to results """
         self.logger.info(f" [+] Page {self.page_no}")
-        url = f'https://www.linkedin.com/search/results/people/?keywords={query}&origin=GLOBAL_SEARCH_HEADER'
         self.driver.get(url)
         if self.cookie_expired():
             raise LoginRequired()
@@ -97,18 +165,35 @@ class Linkedin_Bot():
             self.wait_for_element("//div[@class='entity-result']", timeout=5)
             self.driver.execute_script("window.scrollBy(0, document.body.scrollHeight)")
             self.im_not_robot(delay={'min':3, 'max':5})
-            for profile in self.driver.find_elements(By.XPATH, "//button[contains(@aria-label,'Invite')]"):
-                name = re.match(r"(?:Invite)(.*?)to", profile.get_attribute("aria-label")).group(1).strip()
+            sel = Selector(text=self.driver.page_source)
+            for profile, parser in zip(self.driver.find_elements(By.XPATH, "//button[contains(@aria-label,'Invite')]"), sel.xpath("//button[contains(@aria-label,'Invite')]/ancestor::div[@class='entity-result']")):
+                person = self.parse(parser)
+                # interactions
                 self.action.move_to_element(profile).click().perform()
-                self.connect(name)
+                self.connect(person)
                 self.im_not_robot(delay={"min":3, "max":5})
                 if self.connect_count == self.connects_limit:
                     return None
                 else:
                     self.connect_count +=1
-            if self.wait_for_element("//button[@aria-label='Next']"):
-                self.page_no +=1
-                self.search(url + f"&page={self.page_no}")
+                # next page
+                if self.wait_for_element("//button[@aria-label='Next']"):
+                    self.page_no +=1
+                    self.search(url + f"&page={self.page_no}")
+    
+
+    def parse(self, response):
+        source_url = response.xpath(".//a[contains(@class,'scale')]/@href").get()
+        name = re.match(r"(?:Invite)(.*?)to", response.xpath(".//button[contains(@aria-label,'Invite')]/@aria-label").get()).group(1).strip()
+        profile_headline = response.xpath(".//div[contains(@class, 'entity-result__primary-subtitle')]/text()[2]").get()
+        location = response.xpath(".//div[contains(@class, 'entity-result__secondary-subtitle')]/text()[2]").get()
+        item = {
+            'url':source_url,
+            'name':name,
+            'profile_headline':profile_headline,
+            'location':location
+        }
+        return item
 
     
     def check_captcha(self):
@@ -143,11 +228,11 @@ class Linkedin_Bot():
             return False
 
 
-    def login(self, username, password):   
+    def login(self):   
         try:
             self.driver.get(self.login_url)
-            self.driver.find_element(By.XPATH,"//input[@id='username']").send_keys(username)
-            self.driver.find_element(By.XPATH,"//input[@id='password']").send_keys(password)
+            self.driver.find_element(By.XPATH,"//input[@id='username']").send_keys(self.username)
+            self.driver.find_element(By.XPATH,"//input[@id='password']").send_keys(self.password)
             self.im_not_robot()
             self.driver.find_element(By.XPATH,"//button[@aria-label='Sign in']").click()
             self.check_captcha()
@@ -180,24 +265,26 @@ class Linkedin_Bot():
 
     
     def main(self):
-        username, password = self.load_creds()
         query = self.take_args()
-        self.init_driver()
-        if self.load_cookies():
-            try:
-                self.search(query)
-            except LoginRequired:
-                self.login(username, password)
+        self.load_config()
+        if self.init_db():
+            self.init_driver()
+            if self.load_cookies():
+                try:
+                    self.search(query)
+                except LoginRequired:
+                    self.login()
+                    if self.logged_In:
+                        self.search(query)
+            else:
+                self.login()
                 if self.logged_In:
                     self.search(query)
-        else:
-            self.login(username, password)
-            if self.logged_In:
-                self.search(query)
-        self.driver.close()
+            self.driver.close()
 
 
 bot = Linkedin_Bot()
 bot.main()
+
 
 
