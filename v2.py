@@ -152,7 +152,7 @@ class Linkedin_Bot():
                 self.im_not_robot()
                 self.driver.find_element(By.XPATH,"//textarea[@id='custom-message']").send_keys(self.message)
                 self.im_not_robot()
-            # self.driver.find_element(By.XPATH,"//button[@aria-label='Send now']").click()
+            self.driver.find_element(By.XPATH,"//button[@aria-label='Send now']").click()
             self.logger.info(f" [+] Request sent to {person['name']}!")
             self.dump_person(person)
         except TimeoutError:
