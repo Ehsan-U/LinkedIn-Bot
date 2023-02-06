@@ -5,6 +5,12 @@
     },
     "db_config": {
         "uri": "sqlite:///mydb.db"
+    },
+    "proxies": {
+        "username": "",
+        "password": "",
+        "server": "",
+        "port": ""
     }
     
 }

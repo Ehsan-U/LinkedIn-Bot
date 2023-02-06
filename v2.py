@@ -1,6 +1,7 @@
 import sys
 import time
 import traceback
+from seleniumwire import undetected_chromedriver as wire_uc
 import undetected_chromedriver as uc
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -58,7 +59,25 @@ class Linkedin_Bot():
 
 
     def init_driver(self):
-        self.driver = uc.Chrome()
+        if self.use_proxy:
+            self.logger.info(" [+] Using proxies")
+            if self.proxy_user:
+                options = {
+                    "proxy": {
+                        "http": f"http://{self.proxy_user}:{self.proxy_pass}@{self.proxy_server}:{self.proxy_port}",
+                        "https": f"http://{self.proxy_user}:{self.proxy_pass}@{self.proxy_server}:{self.proxy_port}"
+                    },
+                }
+            else:
+                options = {
+                    "proxy": {
+                        "http": f"http://{self.proxy_server}:{self.proxy_port}",
+                        "https": f"http://{self.proxy_server}:{self.proxy_port}"
+                    },
+                }
+            self.driver = wire_uc.Chrome(seleniumwire_options=options)
+        else:
+            self.driver = uc.Chrome()
         self.driver.maximize_window()
         self.driver.get("https://www.linkedin.com/")
         self.action = ActionChains(self.driver)
@@ -83,22 +102,6 @@ class Linkedin_Bot():
             return True
 
 
-    # def already_exist(self, item):
-    #     table = Table(
-    #         'connections', 
-    #         self.metadata,
-    #         Column('person_id', String, primary_key=True, nullable=False),
-    #         Column('url', String),
-    #         Column('name', String),
-    #         Column('location', String),
-    #         Column('profile_headline', String),
-    #     )
-    #     statement = select(table).where(table.columns.get('person_id') == item['person_id'])
-    #     result = self.conn.execute(statement)
-    #     record = result.fetchone()
-    #     return record
-
-
     def dump_person(self, item):
         person = Person(
             person_id = item['person_id'],
@@ -112,13 +115,17 @@ class Linkedin_Bot():
         # else:
             # self.logger.info(f" [+] {item['name']} already exist in the db!")
 
-
+    
     def load_config(self):
         if os.path.exists('./config.json'):
             with open('config.json', 'r') as f:
                 config  = json.load(f)
                 self.username, self.password = config['credentials'].values()
                 self.server_uri = config['db_config']['uri']
+                self.proxy_user = config['proxies']['username']
+                self.proxy_pass = config['proxies']['password']
+                self.proxy_server = config['proxies']['server']
+                self.proxy_port = config['proxies']['port']
         else:
             self.logger.info(f" [+] Credentials missing!")
             sys.exit()
@@ -143,7 +150,7 @@ class Linkedin_Bot():
         else:
             return True
 
-
+        
     def connect(self, person):
         """ connect to a person """
         try:
@@ -258,11 +265,13 @@ class Linkedin_Bot():
         parser.add_argument('-q', '--query', dest='query', required=True, default='')
         parser.add_argument('-c', '--connect', dest='connects_limit', default=10, type=int)
         parser.add_argument('-m', '--message', dest='message', default='', help="e.g -m 'hello there!'")
+        parser.add_argument('-p', '--proxy', dest='proxy', default=False, type=bool)
         values = parser.parse_args()
         args_dict = vars(values)
         query = args_dict.get('query')
         self.connects_limit = args_dict.get('connects_limit')
         self.message = args_dict.get('message')
+        self.use_proxy = args_dict.get("proxy")
         if query:
             return query
         else:
