@@ -1,0 +1,7 @@
+coloredlogs==15.0.1
+parsel==1.7.0
+PyAutoGUI==0.9.53
+selenium==4.8.0
+selenium_wire==5.1.0
+SQLAlchemy==2.0.1
+undetected_chromedriver==3.2.1
