@@ -3,6 +3,7 @@ The bot automates various tasks on the site, such as logging in, searching for c
 
 ## Features
 - Login functionality
+- Cookies management
 - Scrape information from LinkedIn profiles
 - Data storage: The extracted data is stored in a database
 - Proxy support
